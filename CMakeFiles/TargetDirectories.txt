@@ -1,3 +1,0 @@
-/home/mumumusuc/raspberry/nfs/workspace/bluez-ns-controller/CMakeFiles/rebuild_cache.dir
-/home/mumumusuc/raspberry/nfs/workspace/bluez-ns-controller/CMakeFiles/controller.dir
-/home/mumumusuc/raspberry/nfs/workspace/bluez-ns-controller/CMakeFiles/edit_cache.dir

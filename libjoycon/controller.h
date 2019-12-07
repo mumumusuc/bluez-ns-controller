@@ -75,21 +75,7 @@ typedef struct Stick
 } Stick_t;
 //static_assert(sizeof(Stick_t) == 3);
 
-typedef struct Accelerator
-{
-    int16_t X;
-    int16_t Y;
-    int16_t Z;
-} Accelerator_t;
-
-typedef struct Gyro
-{
-    int16_t X;
-    int16_t Y;
-    int16_t Z;
-} Gyro_t;
-
-typedef struct Payload
+typedef struct Controller
 {
     PowerType_t power_type : 1;
     DeviceType_t device_type : 3;
@@ -97,49 +83,7 @@ typedef struct Payload
     Button_t button;
     Stick_t left_stick;
     Stick_t right_stick;
-} Payload_t;
+} Controller_t;
 //static_assert(sizeof(Payload_t) == 10);
-
-// for report_id 0x21
-typedef struct StandardData
-{
-    u_char subcmd_ack;
-    u_char subcmd_id;
-    u_char data[49];
-} StandardData_t;
-
-// for report_id 0x23
-typedef struct PeripheralsData
-{
-    union {
-        u_char nfc[37];
-        u_char ir[37];
-    };
-
-} PeripheralsData_t;
-
-// for report_id 0x30,0x31,0x32,0x33
-typedef struct SixAxisData
-{
-    Accelerator_t acc_0;
-    Gyro_t gyro_0;
-    Accelerator_t acc_1;
-    Gyro_t gyro_1;
-    Accelerator_t acc_2;
-    Gyro_t gyro_2;
-} SixAxisData_t;
-
-typedef struct InputReport
-{
-    u_char id;
-    u_char timer;
-    Payload_t payload;
-    u_char vibrator;
-    union {
-        StandardData_t reply;
-        PeripheralsData_t peripherals;
-        SixAxisData_t six_axis;
-    };
-} InputReport_t;
 
 #pragma pack()

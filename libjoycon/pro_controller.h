@@ -1,6 +1,6 @@
 #include "controller.h"
 
-void init(Payload_t *payload)
+void init(Controller_t *payload)
 {
     payload->device_type = PRO_GRIP;
     payload->battery_level = MEDIUM;

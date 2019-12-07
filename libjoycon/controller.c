@@ -9,7 +9,7 @@ int main()
 {
     printf("hello world\n");
 
-    Payload_t pro;
+    Controller_t pro;
     memset(&pro, 0, sizeof(pro));
     init(&pro);
     pro.button.Y = PRESSED;

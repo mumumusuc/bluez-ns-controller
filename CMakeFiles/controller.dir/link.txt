@@ -1,1 +1,0 @@
-/usr/bin/cc   -rdynamic CMakeFiles/controller.dir/controller.c.o  -o controller 
