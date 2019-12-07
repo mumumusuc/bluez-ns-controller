@@ -1,0 +1,30 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/mumumusuc/raspberry/nfs/workspace/bluez-ns-controller/libjoycon/controller.c
+stdlib.h
+-
+stdio.h
+-
+memory.h
+-
+pro_controller.h
+/home/mumumusuc/raspberry/nfs/workspace/bluez-ns-controller/libjoycon/pro_controller.h
+
+/home/mumumusuc/raspberry/nfs/workspace/bluez-ns-controller/libjoycon/controller.h
+stdlib.h
+-
+stdio.h
+-
+stdint.h
+-
+
+/home/mumumusuc/raspberry/nfs/workspace/bluez-ns-controller/libjoycon/pro_controller.h
+controller.h
+/home/mumumusuc/raspberry/nfs/workspace/bluez-ns-controller/libjoycon/controller.h
+

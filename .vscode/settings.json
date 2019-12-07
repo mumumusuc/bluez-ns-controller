@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "controller.h": "c"
+    },
+    "C_Cpp.default.configurationProvider": "go2sh.cmake-integration"
+}
