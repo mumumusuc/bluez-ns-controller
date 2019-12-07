@@ -1,3 +1,6 @@
+#ifndef _OUTPUT_REPORT_H_
+#define _OUTPUT_REPORT_H_
+
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -182,3 +185,5 @@ typedef struct OutputReport
         RumbleData_t rumble;
     };
 } OutputReport_t;
+
+#endif // !_OUTPUT_REPORT_H_

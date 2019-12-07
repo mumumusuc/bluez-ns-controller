@@ -1,5 +1,7 @@
+#ifndef _CONTROLLER_H_
+#define _CONTROLLER_H_
+
 #include <stdlib.h>
-#include <stdio.h>
 #include <stdint.h>
 
 #pragma pack(1)
@@ -87,3 +89,4 @@ typedef struct Controller
 //static_assert(sizeof(Payload_t) == 10);
 
 #pragma pack()
+#endif // !_CONTROLLER_H_

@@ -1,4 +1,14 @@
+#ifndef _INPUT_REPORT_H_
+#define _INPUT_REPORT_H_
+#include <stdlib.h>
+#include <stdint.h>
+#include <memory.h>
 #include "controller.h"
+
+#define STANDARD_REPORT_SIZE 64
+#define LARGE_REPORT_SIZE 362
+#define STANDARD_PACKET_SIZE 36
+#define EXTRA_PACKET_SIZE 313
 
 typedef struct Accelerator
 {
@@ -14,34 +24,30 @@ typedef struct Gyroscope
     int16_t Z;
 } Gyroscope_t;
 
-// for report_id 0x21
+// 0x21 : 13~48(36)
 typedef struct ReplyData
 {
-    u_char subcmd_ack;
-    u_char subcmd_id;
-    u_char data[49];
+    u_char subcmd_ack;                     //13
+    u_char subcmd_id;                      //14
+    u_char data[STANDARD_PACKET_SIZE - 2]; //15~49(34)
 } ReplyData_t;
 
-// for report_id 0x23
-typedef struct PeripheralsData
+// 0x31 : 49~361(313)
+typedef struct PeripheralData
 {
     union {
-        u_char nfc[37];
-        u_char ir[37];
+        u_char nfc[EXTRA_PACKET_SIZE];
+        u_char ir[EXTRA_PACKET_SIZE];
     };
-} PeripheralsData_t;
+} PeripheralData_t;
 
-typedef struct NfcData
+// 0x23 : 13~48(36)
+typedef struct McuData
 {
+    u_char raw[STANDARD_PACKET_SIZE];
+} McuData_t;
 
-} NfcData_t;
-
-typedef struct IrData
-{
-
-} IrData_t;
-
-// for report_id 0x30,0x31,0x32,0x33
+// 0x30,0x31,0x32,0x33 : 13~48(36)
 typedef struct ImuData
 {
     Accelerator_t acc_0;
@@ -52,35 +58,43 @@ typedef struct ImuData
     Gyroscope_t gyro_2;
 } ImuData_t;
 
-typedef struct StandardReport
+// 48 bytes
+typedef struct StandardPacket
 {
-    u_char timer;
-    Controller_t payload;
-    u_char vibrator;
-    union {
+    u_char timer;            // 1
+    Controller_t controller; // 2~11
+    u_char vibration;        // 12
+    union {                  // 13~48
         ReplyData_t reply;
-        NfcData_t nfc;
-        IrData_t ir;
+        McuData_t mcu;
         ImuData_t imu;
     };
-} StandardReport_t;
+} StandardPacket_t;
 
-typedef struct LargePacketReport
+typedef struct LargePacket
 {
-    u_char raw[313];
-} LargePacketReport_t;
+    StandardPacket_t standard;
+    PeripheralData_t extra;
+} LargePacket_t;
 
-typedef struct UsbReport
+typedef struct UsbPacket
 {
-    u_char raw[63];
-} UsbReport_t;
+    u_char raw[48];
+} UsbPacket_t;
 
+#pragma pack(1)
 typedef struct InputReport
 {
     u_char id;
     union {
-        u_char raw[63];
-        UsbReport_t usb;
-        StandardReport_t standard;
+        UsbPacket_t usb;
+        StandardPacket_t standard;
+        LargePacket_t large;
     };
 } InputReport_t;
+#pragma pack()
+
+InputReport_t *createInputReport(void *);
+void releaseInputReport(InputReport_t *);
+
+#endif // !_INPUT_REPORT_H_

@@ -1,5 +1,9 @@
 {
     "files.associations": {
-        "controller.h": "c"
+        "controller.h": "c",
+        "stdlib.h": "c",
+        "stdint.h": "c",
+        "pro_controller.h": "c",
+        "input_report.h": "c"
     }
 }
