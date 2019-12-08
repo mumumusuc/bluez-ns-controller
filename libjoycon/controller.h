@@ -1,29 +1,29 @@
 #ifndef _CONTROLLER_H_
 #define _CONTROLLER_H_
 
-#include <stdlib.h>
 #include <stdint.h>
+#include "device.h"
 
 #pragma pack(1)
 
 typedef enum BatteryLevel
 {
-    EMPTY = 0,      // 0000
-    u_charGING = 1, // 0001
-    CRITICAL = 2,   // 0010
-    LOW = 4,        // 0100
-    MEDIUM = 6,     // 0110
-    FULL = 8,       // 1000
+    EMPTY = 0,    // 0000
+    CHARGING = 1, // 0001
+    CRITICAL = 2, // 0010
+    LOW = 4,      // 0100
+    MEDIUM = 6,   // 0110
+    FULL = 8,     // 1000
 } BatteryLevel_t;
 
 typedef enum DeviceType
 {
     PRO_GRIP = 0,
-    HANDHELD = 1,    // from yuzu
-    JoyCon_DUAL = 2, //from yuzu
-    JoyCon_LEFT = 3,
-    JoyCon_RIGHT = 4,
-    POKE_BALL = 6, // from yuzu
+    HANDHELD = 1,     // from yuzu
+    JoyCon_DUAL = 2,  // from yuzu
+    JoyCon_LEFT = 3,  //
+    JoyCon_RIGHT = 4, //
+    POKE_BALL = 6,    // from yuzu
 } DeviceType_t;
 
 typedef enum PowerType

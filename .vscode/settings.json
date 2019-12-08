@@ -4,6 +4,10 @@
         "stdlib.h": "c",
         "stdint.h": "c",
         "pro_controller.h": "c",
-        "input_report.h": "c"
+        "input_report.h": "c",
+        "output_report.h": "c",
+        "assert.h": "c",
+        "typeinfo": "cpp",
+        "time.h": "c"
     }
 }

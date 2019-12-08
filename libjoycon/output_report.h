@@ -3,16 +3,44 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include "device.h"
+
+#define OUTPUT_REPORT_CMD 0x01
+#define OUTPUT_REPORT_RUM 0x10
+#define OUTPUT_REPORT_PHL 0x11
+#define OUTPUT_REPORT_USB 0x80
+
+typedef enum Player
+{
+    PLAYER_1 = 0x1,
+    PLAYER_2 = 0x2,
+    PLAYER_3 = 0x7,
+    PLAYER_4 = 0xF,
+} Player_t;
+
+typedef enum PlayerFlash
+{
+    PLAYER_FLASH_1 = 0x1,
+    PLAYER_FLASH_2 = 0x2,
+    PLAYER_FLASH_3 = 0x7,
+    PLAYER_FLASH_4 = 0xF,
+} PlayerFlash_t;
+
+#pragma pack(1)
+// 11~63(53)
+typedef struct SubCmd
+{
+    u_char raw[53];
+} SubCmd_t;
 
 // Sub-command 0x01: Bluetooth manual pairing
 typedef struct SubCmd_01
 {
-    u_char subcmd;
-    union {
-        u_char bt_address[6]; // little endian
-        u_char raw[48];
-    };
-
+    uint8_t subcmd;       // 11
+    MacAddress_t address; // 12~17(6), little endian
+    uint8_t fixed[3];     // 18~20(3)
+    Alias_t alias;        // 21 ~40(20)
+    uint8_t extra[8];     // 41~48(8)
 } SubCmd_01_t;
 
 typedef struct SubCmd_02
@@ -22,7 +50,6 @@ typedef struct SubCmd_02
 typedef struct SubCmd_03
 {
     u_char subcmd;
-
 } SubCmd_03_t;
 
 typedef struct SubCmd_04
@@ -83,14 +110,8 @@ typedef struct SubCmd_22
 
 typedef struct SubCmd_30
 {
-    u_char player_0 : 1;
-    u_char player_1 : 1;
-    u_char player_2 : 1;
-    u_char player_3 : 1;
-    u_char flash_0 : 1;
-    u_char flash_1 : 1;
-    u_char flash_2 : 1;
-    u_char flash_3 : 1;
+    Player_t player : 4;
+    PlayerFlash_t flash : 4;
 } SubCmd_30_t;
 
 typedef struct SubCmd_38
@@ -142,11 +163,17 @@ typedef struct SubCmd_50
 {
 } SubCmd_50_t;
 
+typedef struct RumbleData
+{
+    u_char raw[8];
+} RumbleData_t;
+
 typedef struct CmdData
 {
-    RumbleData_t rumble;
-    u_char cmd;
-    union {
+    RumbleData_t rumble; // 2~9(8)
+    u_char cmd;          // 10
+    union {              // 11~63(53)
+        SubCmd_t subcmd;
         SubCmd_01_t subcmd_01;
         SubCmd_03_t subcmd_03;
         SubCmd_10_t subcmd_10;
@@ -164,26 +191,22 @@ typedef struct UsbData
 
 } UsbData_t;
 
-typedef struct RumbleData
-{
-    u_char raw[8];
-} RumbleData_t;
-
-#define OUTPUT_REPORT_CMD 0x01
-#define OUTPUT_REPORT_RUM 0x10
-#define OUTPUT_REPORT_PHL 0x11
-#define OUTPUT_REPORT_USB 0x80
-
 typedef struct OutputReport
 {
-    u_char id; // 0x01,0x80,0x10,0x11
-    u_char timer;
-    union {
+    u_char id;    // 0 : 0x01,0x80,0x10,0x11
+    u_char timer; // 1
+    union {       // 2~63(62)
         u_char raw[62];
         UsbData_t usb;
         CmdData_t cmd;
         RumbleData_t rumble;
     };
 } OutputReport_t;
+
+#pragma pack()
+
+OutputReport_t *createOutputReport(void *);
+OutputReport_t *createCmdOutputReport(void *, uint8_t, SubCmd_t *, size_t);
+void releaseOutputReport(OutputReport_t *report);
 
 #endif // !_OUTPUT_REPORT_H_

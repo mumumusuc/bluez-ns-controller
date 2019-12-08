@@ -1,62 +1,61 @@
-#include <stdlib.h>
-#include <stdio.h>
 #include <assert.h>
 #include "input_report.h"
 #include "pro_controller.h"
 
-InputReport_t *createInputReport(void *buffer)
+#define _STATIC_INLINE_ static inline
+
+_STATIC_INLINE_ Controller_t *createController(void *buffer)
 {
-    InputReport_t *report;
+    Controller_t *payload;
     if (buffer)
     {
-        report = (InputReport_t *)buffer;
+        payload = (Controller_t *)buffer;
     }
     else
     {
-        report = (InputReport_t *)malloc(sizeof(InputReport_t));
+        payload = (Controller_t *)malloc(sizeof(Controller_t));
     }
-    if (!report)
+    if (!payload)
+        //return -ENOMEM;
         return NULL;
-    memset(report, 0, sizeof(InputReport_t));
+    bzero(payload, sizeof(Controller_t));
+    //memset(payload, 0, sizeof(Controller_t));
+    return payload;
 }
 
-void releaseInputReport(InputReport_t *report)
+_STATIC_INLINE_ void releaseController(Controller_t *controller)
 {
-    free(report);
+    free(controller);
 }
 
-void dump_hex(uint8_t *data, size_t len);
-
-int main()
+Controller_t *createProController(void *buffer)
 {
-    printf("hello world\n");
-
-    Controller_t *pro = createProController(NULL);
-    assert(pro != NULL);
-    pro->button.Y = PRESSED;
-    pro->button.X = PRESSED;
-    pro->button.L = PRESSED;
-    pro->button.ZL = PRESSED;
-    dump_hex((uint8_t *)pro, sizeof(*pro));
-
-    InputReport_t *report = createInputReport(NULL);
-    assert(report != NULL);
-    report->id = 0x30;
-    report->standard.timer = 0x01;
-    report->standard.controller = *pro;
-    report->standard.imu.acc_0.X = 0xFF00;
-    dump_hex((uint8_t *)report, sizeof(*report));
-
-    releaseProController(pro);
-    releaseInputReport(report);
-    return 0;
+    Controller_t *payload = createController(buffer);
+    if (!payload)
+        return NULL;
+    payload->device_type = PRO_GRIP;
+    payload->battery_level = FULL;
+    payload->power_type = SELF;
+    return payload;
 }
 
-void dump_hex(uint8_t *data, size_t len)
+void releaseProController(Controller_t *controller)
 {
-    if (!data)
-        return;
-    for (int i = 0; i < len; i++)
-        fprintf(stdout, "0x%02x ", data[i]);
-    fprintf(stdout, "\n");
+    releaseController(controller);
+}
+
+Controller_t *createJoyCon(void *buffer)
+{
+    Controller_t *payload = createController(buffer);
+    if (!payload)
+        return NULL;
+    payload->device_type = JoyCon_DUAL;
+    payload->battery_level = FULL;
+    payload->power_type = SELF;
+    return payload;
+}
+
+void releaseJoyCon(Controller_t *controller)
+{
+    releaseController(controller);
 }
