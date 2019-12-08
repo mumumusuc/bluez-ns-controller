@@ -26,6 +26,14 @@ typedef enum PlayerFlash
     PLAYER_FLASH_4 = 0xF,
 } PlayerFlash_t;
 
+typedef enum HciMode
+{
+    DISCONNECT = 0x0,
+    RECONNECT = 0x1,
+    REPAIR = 0x2,
+    REBOOT = 0x4,
+} HciMode_t;
+
 #pragma pack(1)
 // 11~63(53)
 typedef struct SubCmd
@@ -62,7 +70,8 @@ typedef struct SubCmd_05
 
 typedef struct SubCmd_06
 {
-    uint8_t subcmd;
+    //uint8_t subcmd;
+    HciMode_t mode : 8;
 } SubCmd_06_t;
 
 typedef struct SubCmd_07

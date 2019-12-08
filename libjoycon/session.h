@@ -16,5 +16,7 @@ int createSession(Recv *, Send *);
 void destroySession();
 
 void device_connect();
+void device_suspend();
+void device_disconnect();
 
 #endif //  _SESSION_H_

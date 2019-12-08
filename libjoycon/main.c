@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <unistd.h>
 #include "session.h"
 #include "input_report.h"
 #include "output_report.h"
@@ -38,6 +39,11 @@ int test_send(uint8_t *buffer, size_t size)
     return write(fd, buffer, size);
 }
 
+void python_call(int (*Print)(const char *))
+{
+    (*Print)("callback from C\n");
+}
+
 int main()
 {
     fd = open(hidraw, O_RDWR);
@@ -47,6 +53,8 @@ int main()
     }
     createSession(test_recv, test_send);
     device_connect();
+    sleep(5);
+    device_disconnect();
     destroySession();
     close(fd);
     /*

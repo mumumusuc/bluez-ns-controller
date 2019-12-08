@@ -20,7 +20,7 @@ struct Session
 
 static inline int do_recv()
 {
-    return session->recv(session->input, sizeof(*session->input));
+    return session->recv((uint8_t *)session->input, sizeof(*session->input));
     //return 0;
 }
 
@@ -37,7 +37,7 @@ static int wait_or_timeout(uint8_t subcmd, size_t timeout)
         if (session->input->standard.reply.subcmd_id == subcmd)
             return 0;
     }
-    printf('[%s] timeout(%ld)\n', __func__, timeout);
+    printf("[%s] timeout(%ld)\n", __func__, timeout);
     return -ETIMEDOUT;
 }
 
@@ -144,9 +144,22 @@ void device_connect()
     wait_or_timeout(0x30, 10);
 }
 
-void device_suspend();
+void device_suspend()
+{
+    SubCmd_t subcmd = {};
+    createCmdOutputReport(session->output, 0x02, NULL, 0);
+    do_send();
+    wait_or_timeout(0x02, 10);
+}
 
-void device_disconnect();
+void device_disconnect()
+{
+    SubCmd_06_t subcmd = {};
+    subcmd.mode = REPAIR;
+    createCmdOutputReport(session->output, 0x06, (SubCmd_t *)&subcmd, sizeof(SubCmd_06_t));
+    do_send();
+    wait_or_timeout(0x06, 15);
+}
 
 // 0x02
 void device_get_info();
