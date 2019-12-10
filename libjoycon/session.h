@@ -4,19 +4,14 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "controller.h"
 
 typedef int(Recv)(uint8_t *, size_t);
 typedef int(Send)(uint8_t *, size_t);
 
 typedef struct Session Session_t;
 
-static Session_t *session;
-
-int createSession(Recv *, Send *);
-void destroySession();
-
-void device_connect();
-void device_suspend();
-void device_disconnect();
+Session_t *Session_create(Device_t *, Recv *, Send *);
+void Session_release(Session_t *);
 
 #endif //  _SESSION_H_

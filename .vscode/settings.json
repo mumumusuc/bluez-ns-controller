@@ -8,6 +8,7 @@
         "output_report.h": "c",
         "assert.h": "c",
         "typeinfo": "cpp",
-        "time.h": "c"
+        "time.h": "c",
+        "session.h": "c"
     }
 }

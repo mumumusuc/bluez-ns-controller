@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include "session.h"
+#include "console.h"
 #include "input_report.h"
 #include "output_report.h"
 #include "pro_controller.h"
@@ -44,18 +45,48 @@ void python_call(int (*Print)(const char *))
     (*Print)("callback from C\n");
 }
 
+int test_recv2(uint8_t *buffer, size_t size)
+{
+    return sprintf(buffer, "test_recv2\n");
+    //return printf("recv -> %s , %ld\n", buffer, size);
+}
+
+int test_send2(uint8_t *buffer, size_t size)
+{
+    return printf("test_send2 -> %s , %ld\n", buffer, size);
+}
+
 int main()
 {
+
     fd = open(hidraw, O_RDWR);
     if (fd < 0)
     {
         perror("open hid failed\n");
     }
+    /*
     createSession(test_recv, test_send);
     device_connect();
+    ControllerColor_t color = {};
+    device_get_color(&color);
+    dump_hex((uint8_t *)&color, sizeof(color));
     sleep(5);
     device_disconnect();
     destroySession();
+    */
+
+    Session_t *session = Session_create(&SwitchConsole, test_recv, test_send);
+    Console_establish(session);
+    Console_getControllerInfo(session);
+    Console_getControllerColor(session);
+    for (int i = 0; i <= 0xF; i++)
+    {
+        Console_setPlayerLight(session, i, 0);
+        usleep(1000 * 300);
+    }
+    Console_setPlayerLight(session, 0, 0xFE);
+    Console_abolish(session);
+    Session_release(session);
     close(fd);
     /*
     Controller_t *pro = createProController(NULL);

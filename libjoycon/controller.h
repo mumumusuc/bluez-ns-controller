@@ -85,8 +85,74 @@ typedef struct Controller
     Button_t button;
     Stick_t left_stick;
     Stick_t right_stick;
+    void *meta[0]; // point to a device info, but will not increase struct size
 } Controller_t;
 //static_assert(sizeof(Payload_t) == 10);
 
+typedef struct ControllerColor
+{
+    uint32_t body_color : 24;
+    uint32_t button_color : 24;
+    uint32_t left_handler_color : 24;
+    uint32_t right_handler_color : 24;
+} ControllerColor_t;
+
+typedef struct HomeLightPattern
+{
+    uint8_t intensity_2 : 4;
+    uint8_t intensity_1 : 4;
+    uint8_t duration_m_1 : 4;
+    uint8_t fade_duration_m_1 : 4;
+    uint8_t duration_m_2 : 4;
+    uint8_t fade_duration_m_2 : 4;
+} HomeLightPattern_t;
+
 #pragma pack()
+
+typedef enum Player
+{
+    PLAYER_1 = 0x1,
+    PLAYER_2 = 0x2,
+    PLAYER_3 = 0x7,
+    PLAYER_4 = 0xF,
+} Player_t;
+
+typedef enum PlayerFlash
+{
+    PLAYER_FLASH_1 = 0x1,
+    PLAYER_FLASH_2 = 0x2,
+    PLAYER_FLASH_3 = 0x7,
+    PLAYER_FLASH_4 = 0xF,
+} PlayerFlash_t;
+
+typedef enum HciMode
+{
+    DISCONNECT = 0x0,
+    RECONNECT = 0x1,
+    REPAIR = 0x2,
+    REBOOT = 0x4,
+} HciMode_t;
+
+// examples
+static Device_t JoyCon_L = {
+    .role = CONTROLLER,
+    .name = "Joy-Con (L)",
+    .mac_address = "",
+    .serial_number = "XBW17006642912",
+};
+
+static Device_t JoyCon_R = {
+    .role = CONTROLLER,
+    .name = "Joy-Con (R)",
+    .mac_address = "DC:68:EB:30:7F:08",
+    .serial_number = "XCW17006887993",
+};
+
+static Device_t ProController = {
+    .role = CONTROLLER,
+    .name = "Pro Controller",
+    .mac_address = "",
+    .serial_number = "",
+};
+
 #endif // !_CONTROLLER_H_

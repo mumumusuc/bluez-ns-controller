@@ -1,8 +1,7 @@
 #include <assert.h>
+#include "defs.h"
 #include "input_report.h"
 #include "pro_controller.h"
-
-#define _STATIC_INLINE_ static inline
 
 _STATIC_INLINE_ Controller_t *createController(void *buffer)
 {
@@ -19,7 +18,6 @@ _STATIC_INLINE_ Controller_t *createController(void *buffer)
         //return -ENOMEM;
         return NULL;
     bzero(payload, sizeof(Controller_t));
-    //memset(payload, 0, sizeof(Controller_t));
     return payload;
 }
 
