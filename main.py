@@ -84,10 +84,21 @@ if __name__ == '__main__':
     '''
     device = hid.device()
     device.open(JoyCon_R_ID[0], JoyCon_R_ID[1])
-    #device.set_nonblocking(True)
+    # device.set_nonblocking(True)
 
     console = libjoycon.Console(device=device)
-    console.setHomeLight(None)
-    
+    info = console.getControllerInfo()
+    print(info.firmware, info.category, info.mac_address)
+    voltage = console.getControllerVoltage()
+    print('voltage : ', hex(voltage))
+    patterns = [
+        libjoycon.HomeLightPattern(0xF, 0, 0xF),
+        libjoycon.HomeLightPattern(0, 0, 0xF),
+    ]
+    console.setHomeLight(0x0, 0x3, 0x5, patterns)
+    console.testPoll()
+    sleep(5)
+    #console.stopPoll()
+    #sleep(5)
     device.close()
     print('done')

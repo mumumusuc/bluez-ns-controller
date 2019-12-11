@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <memory.h>
+#include "defs.h"
 #include "controller.h"
 
 #define STANDARD_REPORT_SIZE 64
@@ -94,7 +95,7 @@ typedef struct InputReport
 } InputReport_t;
 #pragma pack()
 
-InputReport_t *createInputReport(void *);
-void releaseInputReport(InputReport_t *);
+API_PUBLIC InputReport_t *createInputReport(void *);
+API_PUBLIC void releaseInputReport(InputReport_t *);
 
 #endif // !_INPUT_REPORT_H_

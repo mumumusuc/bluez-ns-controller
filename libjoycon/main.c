@@ -77,8 +77,10 @@ int main()
 
     Session_t *session = Session_create(&SwitchConsole, test_recv, test_send);
     Console_establish(session);
-    Console_getControllerInfo(session);
-    Console_getControllerColor(session);
+    ControllerInfo_t info = {};
+    Console_getControllerInfo(session, &info);
+    ControllerColor_t color = {};
+    Console_getControllerColor(session, &color);
     for (int i = 0; i <= 0xF; i++)
     {
         Console_setPlayerLight(session, i, 0);

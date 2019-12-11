@@ -3,7 +3,7 @@
 
 #include "controller.h"
 
-Controller_t *createProController(void *);
-void releaseProController(Controller_t *);
+API_PUBLIC Controller_t *createProController(void *);
+API_PUBLIC void releaseProController(Controller_t *);
 
 #endif // !_PRO_CONTROLLER_H_

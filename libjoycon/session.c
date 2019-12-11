@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <pthread.h>
 #include "defs.h"
 #include "session.h"
 #include "input_report.h"
@@ -13,6 +14,9 @@
     InputReport_t *input;
     OutputReport_t *output;
     Device_t host;
+    int polling;
+    pthread_t poll_thread;
+    pthread_mutex_t poll_mutex;
 };
 
 Session_t *Session_create(Device_t *host, Recv *recv, Send *send)
@@ -34,6 +38,7 @@ Session_t *Session_create(Device_t *host, Recv *recv, Send *send)
     session->input = createInputReport(NULL);
     if (!session->input)
         goto free;
+    pthread_mutex_init(&session->poll_mutex, NULL);
     return session;
 
 free:
@@ -48,8 +53,21 @@ void Session_release(Session_t *session)
     _FUNC_;
     if (session)
     {
-        free(session->output);
-        free(session->input);
+        if (session->polling || session->poll_thread)
+        {
+            printf("polling, try to cancel it...\n");
+            if (pthread_cancel(session->poll_thread) < 0)
+            {
+                perror("pthread_cancel\n");
+                exit(-1);
+            }
+            pthread_join(session->poll_thread, NULL);
+            pthread_mutex_destroy(&session->poll_mutex);
+            session->poll_thread = 0;
+            free(session->output);
+            free(session->input);
+            printf("release done\n");
+        }
     }
     free(session);
 }

@@ -3,6 +3,11 @@
 #include "input_report.h"
 #include "pro_controller.h"
 
+inline HomeLightPattern_t *get_double_blink_pattern()
+{
+    return double_blink_pattern;
+}
+
 _STATIC_INLINE_ Controller_t *createController(void *buffer)
 {
     Controller_t *payload;
@@ -31,9 +36,9 @@ Controller_t *createProController(void *buffer)
     Controller_t *payload = createController(buffer);
     if (!payload)
         return NULL;
-    payload->device_type = PRO_GRIP;
-    payload->battery_level = FULL;
-    payload->power_type = SELF;
+    payload->category = PRO_GRIP;
+    payload->battery = FULL;
+    payload->power = SELF;
     return payload;
 }
 
@@ -47,9 +52,9 @@ Controller_t *createJoyCon(void *buffer)
     Controller_t *payload = createController(buffer);
     if (!payload)
         return NULL;
-    payload->device_type = JoyCon_DUAL;
-    payload->battery_level = FULL;
-    payload->power_type = SELF;
+    payload->category = JoyCon_DUAL;
+    payload->battery = FULL;
+    payload->power = SELF;
     return payload;
 }
 

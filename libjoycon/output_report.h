@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include "defs.h"
 #include "controller.h"
 
 #define OUTPUT_REPORT_CMD 0x01
@@ -12,13 +13,13 @@
 
 #pragma pack(1)
 // 11~63(53)
-typedef struct SubCmd
+typedef struct
 {
     uint8_t raw[53];
 } SubCmd_t;
 
 // Sub-command 0x01: Bluetooth manual pairing
-typedef struct SubCmd_01
+typedef struct
 {
     uint8_t subcmd;       // 11
     MacAddress_t address; // 12~17(6), little endian
@@ -27,128 +28,149 @@ typedef struct SubCmd_01
     uint8_t extra[8];     // 41~48(8)
 } SubCmd_01_t;
 
-typedef struct SubCmd_02
+// Sub-command 0x02: Request device info
+typedef struct
 {
+
 } SubCmd_02_t;
 
-typedef struct SubCmd_03
+typedef struct
 {
-    uint8_t subcmd;
+    PollType_t poll_type : 8;
 } SubCmd_03_t;
 
-typedef struct SubCmd_04
+typedef struct
 {
 } SubCmd_04_t;
 
-typedef struct SubCmd_05
+typedef struct
 {
 } SubCmd_05_t;
 
-typedef struct SubCmd_06
+typedef struct
 {
     //uint8_t subcmd;
     HciMode_t mode : 8;
 } SubCmd_06_t;
 
-typedef struct SubCmd_07
+typedef struct
 {
 } SubCmd_07_t;
 
-typedef struct SubCmd_08
+typedef struct
 {
     uint8_t subcmd;
 } SubCmd_08_t;
 
-typedef struct SubCmd_10
+typedef struct
 {
     uint32_t address;
     uint8_t length;
 } SubCmd_10_t;
 
-typedef struct SubCmd_11
+typedef struct
 {
     uint32_t address;
     uint8_t length;
     uint8_t data[0x1d];
 } SubCmd_11_t;
 
-typedef struct SubCmd_12
+typedef struct
 {
     uint32_t address;
     uint8_t length;
 } SubCmd_12_t;
 
-typedef struct SubCmd_20
+typedef struct
 {
 } SubCmd_20_t;
 
-typedef struct SubCmd_21
+typedef struct
 {
     uint8_t subcmd;
     uint8_t raw[38];
 } SubCmd_21_t;
 
-typedef struct SubCmd_22
+typedef struct
 {
     uint8_t subcmd;
 } SubCmd_22_t;
 
-typedef struct SubCmd_30
+typedef struct
 {
     Player_t player : 4;
     PlayerFlash_t flash : 4;
 } SubCmd_30_t;
 
-typedef struct SubCmd_38
+typedef struct
+{
+    uint8_t raw[23];
+} Patterns_t;
+
+#define home_light_pattern(patterns, len)                                                        \
+    ({                                                                                           \
+        Patterns_t p = {};                                                                       \
+        for (int i = 0; i < len; i++)                                                            \
+        {                                                                                        \
+            HomeLightPattern_t pts = (patterns)[i];                                              \
+            int pos = i / 2;                                                                     \
+            int res = i % 2;                                                                     \
+            p.raw[3 * pos] |= pts.intensity << (4 * (1 - res));                                  \
+            p.raw[3 * pos + res + 1] = (uint8_t)((pts.transition << 4) | (pts.duration & 0x0F)); \
+        }                                                                                        \
+        p;                                                                                       \
+    })
+
+typedef struct
 {
     uint8_t base_duration : 4;   // 0_L : 1~F = 8~175ms, 0=OFF
     uint8_t pattern_count : 4;   // 0_H :
     uint8_t repeat_count : 4;    // 1_L : 0 = forever
     uint8_t start_intensity : 4; //
-    HomeLightPattern_t patterns[8];
+    Patterns_t patterns;
 } SubCmd_38_t;
 
-typedef struct SubCmd_40
+typedef struct
 {
     uint8_t enable_imu;
 } SubCmd_40_t;
 
-typedef struct SubCmd_41
+typedef struct
 {
-    uint8_t gyro_sensitivity;
-    uint8_t acc_sensitivity;
-    uint8_t gyro_performance;
-    uint8_t acc_bandwidth;
+    GyroSensitivity_t gyro_sensitivity : 8;
+    AccSensitivity_t acc_sensitivity : 8;
+    GyroPerformance_t gyro_performance : 8;
+    AccBandwidth_t acc_bandwidth : 8;
 } SubCmd_41_t;
 
-typedef struct SubCmd_42
+typedef struct
 {
     uint8_t address;
     uint8_t operation;
     uint8_t value;
 } SubCmd_42_t;
 
-typedef struct SubCmd_43
+typedef struct
 {
     uint8_t address;
     uint8_t count;
 } SubCmd_43_t;
 
-typedef struct SubCmd_48
+typedef struct
 {
-    uint8_t enable_vibrator;
+    uint8_t enable_vibration;
 } SubCmd_48_t;
 
-typedef struct SubCmd_50
+typedef struct
 {
 } SubCmd_50_t;
 
-typedef struct RumbleData
+typedef struct
 {
     uint8_t raw[8];
 } RumbleData_t;
 
-typedef struct CmdData
+typedef struct
 {
     RumbleData_t rumble; // 2~9(8)
     uint8_t cmd;         // 10
@@ -166,12 +188,12 @@ typedef struct CmdData
     };
 } CmdData_t;
 
-typedef struct UsbData
+typedef struct
 {
 
 } UsbData_t;
 
-typedef struct OutputReport
+typedef struct
 {
     uint8_t id;    // 0 : 0x01,0x80,0x10,0x11
     uint8_t timer; // 1
@@ -185,8 +207,8 @@ typedef struct OutputReport
 
 #pragma pack()
 
-OutputReport_t *createOutputReport(void *);
-OutputReport_t *createCmdOutputReport(void *, uint8_t, SubCmd_t *, size_t);
-void releaseOutputReport(OutputReport_t *report);
+API_PUBLIC OutputReport_t *createOutputReport(void *);
+API_PUBLIC OutputReport_t *createCmdOutputReport(void *, uint8_t, SubCmd_t *, size_t);
+API_PUBLIC void releaseOutputReport(OutputReport_t *report);
 
 #endif // !_OUTPUT_REPORT_H_
