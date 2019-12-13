@@ -4,6 +4,8 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <errno.h>
 #include "session.h"
 #include "console.h"
 #include "input_report.h"
@@ -12,6 +14,7 @@
 
 static const char *hidraw = "/dev/hidraw0";
 static int fd;
+static uint8_t test_magic;
 
 void dump_hex(uint8_t *data, size_t len)
 {
@@ -47,35 +50,63 @@ void python_call(int (*Print)(const char *))
 
 int test_recv2(uint8_t *buffer, size_t size)
 {
-    return sprintf(buffer, "test_recv2\n");
-    //return printf("recv -> %s , %ld\n", buffer, size);
+    usleep(1000 * 500);
+    buffer[0] = test_magic;
+    return 1;
+    //return sprintf(buffer, "test_recv2\n");
 }
 
 int test_send2(uint8_t *buffer, size_t size)
 {
-    return printf("test_send2 -> %s , %ld\n", buffer, size);
+    //test_magic = buffer[0];
+    return 1;
+    //return printf("test_send2 -> %s , %ld\n", buffer, size);
+}
+
+static void *test_input_thread(void *arg)
+{
+    Session_t *session = (Session_t *)arg;
+    for (int i = 0; i < 5; i++)
+    {
+        _func_printf_();
+        int ret = Console_test(session, 'p');
+        _func_printf_("Console_test return -> %d", ret);
+        assert(ret == -ETIMEDOUT);
+    }
+
+    pthread_exit(NULL);
+    return NULL;
 }
 
 int main()
 {
-
+    /*
     fd = open(hidraw, O_RDWR);
     if (fd < 0)
     {
         perror("open hid failed\n");
     }
-    /*
-    createSession(test_recv, test_send);
-    device_connect();
-    ControllerColor_t color = {};
-    device_get_color(&color);
-    dump_hex((uint8_t *)&color, sizeof(color));
-    sleep(5);
-    device_disconnect();
-    destroySession();
     */
+    Session_t *session = Session_create(&SwitchConsole, test_recv2, test_send2);
+    test_magic = 'm';
+    Console_testPoll(session);
+    pthread_t input;
+    pthread_create(&input, NULL, test_input_thread, session);
+    usleep(500 * 1000);
 
-    Session_t *session = Session_create(&SwitchConsole, test_recv, test_send);
+    for (int i = 0; i < 3; i++)
+    {
+        _func_printf_();
+        int ret = Console_test(session, test_magic);
+        _func_printf_("Console_test return -> %d", ret);
+        assert(ret >= 0);
+        usleep(1000 * 500);
+    }
+    pthread_join(input, NULL);
+    Console_stopPoll(session);
+    usleep(500 * 1000);
+    Session_release(session);
+    /*
     Console_establish(session);
     ControllerInfo_t info = {};
     Console_getControllerInfo(session, &info);
@@ -90,6 +121,7 @@ int main()
     Console_abolish(session);
     Session_release(session);
     close(fd);
+    */
     /*
     Controller_t *pro = createProController(NULL);
     assert(pro != NULL);

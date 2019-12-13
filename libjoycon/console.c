@@ -1,13 +1,28 @@
+#include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <assert.h>
 #include <unistd.h>
-#include <stdio.h>
-#include <pthread.h>
 #include "defs.h"
+#include "task.h"
 #include "session.h"
 #include "console.h"
 #include "input_report.h"
 #include "output_report.h"
+
+struct Session
+{
+    Recv *recv;
+    Send *send;
+    InputReport_t *input;
+    OutputReport_t *output;
+    Device_t host;
+    int polling;
+    pthread_t poll_thread;
+    pthread_rwlock_t input_lock;
+    pthread_rwlock_t output_lock;
+    TaskHead_t tasks;
+};
 
 #define msleep(t) usleep(1000 * (t))
 #define assert_console_session(s)        \
@@ -17,371 +32,275 @@
         assert(s->host.role == CONSOLE); \
     } while (0)
 
-/*extern*/ struct Session
-{
-    Recv *recv;
-    Send *send;
-    InputReport_t *input;
-    OutputReport_t *output;
-    Device_t host;
-    int polling;
-    pthread_t poll_thread;
-    pthread_mutex_t poll_mutex;
-};
-/*
-_STATIC_INLINE_ void _dump_hex(uint8_t *data, size_t len)
-{
-    if (!data)
-        return;
-    for (int i = 0; i < len; i++)
-        fprintf(stdout, "%02x ", data[i]);
-    fprintf(stdout, "\n");
-}
-*/
-_STATIC_INLINE_ int _send(Session_t *s)
-{
-    _FUNC_;
-    //_dump_hex((uint8_t *)s->output, sizeof(*s->output));
-    return s->send((uint8_t *)s->output, sizeof(*s->output));
-}
+#define _send_begin(session) \
+    do                       \
+    {                        \
+    pthread_rwlock_rdlock(&session->output_lock)
 
-_STATIC_INLINE_ int _recv(Session_t *s)
-{
-    _FUNC_;
-    int ret = s->recv((uint8_t *)s->input, sizeof(*s->input));
-    if (ret < 0)
-    {
-        printf("recv error -> %d\n", ret);
-        return ret;
-    }
-    //_dump_hex((uint8_t *)s->input, ret);
-    return ret;
-}
+#define _send_end(session)                                               \
+    session->send((uint8_t *)session->output, sizeof(*session->output)); \
+    pthread_rwlock_unlock(&session->output_lock);                        \
+    }                                                                    \
+    while (0)
+
+#define _recv_begin(session) \
+    do                       \
+    {                        \
+    pthread_rwlock_wrlock(&session->input_lock)
+
+#define _recv_end(session)                                             \
+    session->recv((uint8_t *)session->input, sizeof(*session->input)); \
+    pthread_rwlock_unlock(&session->input_lock);                       \
+    }                                                                  \
+    while (0)
 
 _STATIC_INLINE_ int _wait_until_timeout(Session_t *s, uint8_t subcmd, size_t timeout)
 {
-    if (s->polling)
+    _func_printf_();
+    int ret = 0;
+    Task_t *task = (Task_t *)malloc(sizeof(Task_t));
+    task_init(task);
+    task->timeout = timeout;
+    task_add(&s->tasks, task);
+    _func_printf_("add task(%p) {pre=%p, next=%p}", task, task->head.pre, task->head.next);
+    pthread_t self = pthread_self();
+    _func_printf_("jam this thread[%lu]...", self);
+    pthread_mutex_lock(&task->lock);
+    while (task->state != DONE)
     {
-        return 0;
-    }
-    else
-    {
-        while (timeout--)
+        if (0 != pthread_cond_wait(&task->cond, &task->lock))
         {
-            _recv(s);
-            if (s->input->id == 0x21 && s->input->standard.reply.subcmd_id == subcmd)
-                return 0;
+            _func_printf_("pthread_cond_wait error(%d),what hanppend?", errno);
+            break;
         }
-        printf("[%s] timeout(%ld)\n", __func__, timeout);
-        return -ETIMEDOUT;
-    }
-}
-
-int Console_establish(Session_t *session)
-{
-    _FUNC_;
-    int ret = 0;
-    SubCmd_t subcmd = {};
-    createCmdOutputReport(session->output, 0x02, NULL, 0);
-    ret = _send(session);
-    _wait_until_timeout(session, 0x02, 10);
-
-    createCmdOutputReport(session->output, 0x08, NULL, 0);
-    ret = _send(session);
-    _wait_until_timeout(session, 0x08, 10);
-
-    bzero(&subcmd, sizeof(SubCmd_10_t));
-    ((SubCmd_10_t *)&subcmd)->address = 0x00006000;
-    ((SubCmd_10_t *)&subcmd)->length = 0x10;
-    createCmdOutputReport(session->output, 0x10, &subcmd, sizeof(SubCmd_10_t));
-    ret = _send(session);
-    _wait_until_timeout(session, 0x10, 10);
-
-    bzero(&subcmd, sizeof(SubCmd_10_t));
-    ((SubCmd_10_t *)&subcmd)->address = 0x00006050;
-    ((SubCmd_10_t *)&subcmd)->length = 0x0d;
-    createCmdOutputReport(session->output, 0x10, &subcmd, sizeof(SubCmd_10_t));
-    ret = _send(session);
-    _wait_until_timeout(session, 0x10, 10);
-
-    //memset(&subcmd, 0, sizeof(SubCmd_01_t));
-    bzero(&subcmd, sizeof(SubCmd_01_t));
-    ((SubCmd_01_t *)&subcmd)->subcmd = 0x04;
-    ((SubCmd_01_t *)&subcmd)->address = mac_address_le(SwitchConsole.mac_address);
-    ((SubCmd_01_t *)&subcmd)->fixed[1] = 0x04;
-    ((SubCmd_01_t *)&subcmd)->fixed[2] = 0x3c;
-    ((SubCmd_01_t *)&subcmd)->alias = alias(SwitchConsole.name);
-    ((SubCmd_01_t *)&subcmd)->extra[0] = 0x68;
-    ((SubCmd_01_t *)&subcmd)->extra[2] = 0xc0;
-    ((SubCmd_01_t *)&subcmd)->extra[3] = 0x39;
-    ((SubCmd_01_t *)&subcmd)->extra[4] = 0x0; // ?
-    ((SubCmd_01_t *)&subcmd)->extra[5] = 0x0; // ?
-    ((SubCmd_01_t *)&subcmd)->extra[6] = 0x0; // ?
-    createCmdOutputReport(session->output, 0x01, &subcmd, sizeof(SubCmd_01_t));
-    ret = _send(session);
-    _wait_until_timeout(session, 0x01, 10);
-
-    bzero(&subcmd, sizeof(SubCmd_03_t));
-    ((SubCmd_03_t *)&subcmd)->poll_type = POLL_STANDARD;
-    createCmdOutputReport(session->output, 0x03, &subcmd, sizeof(SubCmd_03_t));
-    ret = _send(session);
-    _wait_until_timeout(session, 0x03, 10);
-
-    createCmdOutputReport(session->output, 0x04, NULL, 0);
-    ret = _send(session);
-    _wait_until_timeout(session, 0x04, 10);
-
-    bzero(&subcmd, sizeof(SubCmd_30_t));
-    ((SubCmd_30_t *)&subcmd)->player = PLAYER_1;
-    ((SubCmd_30_t *)&subcmd)->flash = PLAYER_FLASH_4;
-    createCmdOutputReport(session->output, 0x30, &subcmd, sizeof(SubCmd_30_t));
-    ret = _send(session);
-    _wait_until_timeout(session, 0x30, 10);
-
-    return 0;
-}
-
-int Console_suspend(Session_t *session)
-{
-    _FUNC_;
-    int ret = 0;
-    SubCmd_t subcmd = {};
-    createCmdOutputReport(session->output, 0x02, NULL, 0);
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x02, 10);
-    return ret;
-}
-
-int Console_abolish(Session_t *session)
-{
-    _FUNC_;
-    int ret = 0;
-    SubCmd_06_t subcmd = {};
-    subcmd.mode = REPAIR;
-    createCmdOutputReport(session->output, 0x06, (SubCmd_t *)&subcmd, sizeof(SubCmd_06_t));
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x06, 10);
-    if (session->polling || session->poll_thread)
-    {
-        ret = pthread_cancel(session->poll_thread);
-        if (ret < 0)
+        // do test
+        _func_printf_("do input test -> %s", (char *)s->input);
+        int ok = (s->input->id == subcmd);
+        //msleep(5);
+        if (ok)
         {
-            perror("pthread_cancel\n");
-            return ret;
+            // do work
+            //msleep(5);
+            task->state = DONE;
+            break;
         }
-        session->poll_thread = 0;
+        else if (--task->timeout)
+        {
+            _func_printf_("timeout remains(%d), re-add this task", task->timeout);
+            task->state = NONE;
+            task_add(&s->tasks, task);
+            continue;
+        }
+        else
+        {
+            // timeout
+            ret = -ETIMEDOUT;
+            task->state = DONE;
+            _func_printf_("timeout, return(%d)", ret);
+            break;
+        }
     }
+    pthread_mutex_unlock(&task->lock);
+    _func_printf_("jam over[%lu]...ret = %d\n", self, ret);
+
+    task_free(task);
+    free(task);
     return ret;
 }
 
-int Console_getControllerInfo(Session_t *session, ControllerInfo_t *info)
+static void _poll_cleanup(void *arg)
 {
-    _FUNC_;
-    if (!info)
-        return -1;
-    int ret = 0;
-    createCmdOutputReport(session->output, 0x02, NULL, 0);
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x02, 10);
-    *info = *(ControllerInfo_t *)session->input->standard.reply.data;
-    printf("info = { fw: %04x , cate: %d , mac: %s }\n", firmware((*info)), info->category, mac_address_str_be(info->mac_address));
-    return ret;
-}
-
-int Console_getControllerVoltage(Session_t *session, uint16_t *voltage)
-{
-    _FUNC_;
-    int ret = 0;
-    createCmdOutputReport(session->output, 0x50, NULL, 0);
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x50, 10);
-    *voltage = _u16_le(session->input->standard.reply.data);
-    return ret;
-}
-
-int Console_getControllerColor(Session_t *session, ControllerColor_t *color)
-{
-    _FUNC_;
-    int ret = 0;
-    SubCmd_10_t subcmd = {};
-    subcmd.address = 0x00006050;
-    subcmd.length = 0x0d;
-    createCmdOutputReport(session->output, 0x10, (SubCmd_t *)&subcmd, sizeof(SubCmd_10_t));
-    ret = _send(session);
-    if (ret < 0)
-        return ret;
-    ret = _wait_until_timeout(session, 0x10, 10);
-    if (ret < 0)
-        return ret;
-    *color = *((ControllerColor_t *)&session->input->standard.reply.data[5]);
-    return ret;
-}
-
-int Console_setPlayerLight(Session_t *session, Player_t player, PlayerFlash_t flash)
-{
-    _FUNC_;
-    int ret = 0;
-    SubCmd_30_t subcmd = {
-        .player = player,
-        .flash = flash,
-    };
-    createCmdOutputReport(session->output, 0x30, (SubCmd_t *)&subcmd, sizeof(SubCmd_30_t));
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x30, 10);
-    return ret;
-}
-
-int Console_setHomeLight(Session_t *session, uint8_t intensity, uint8_t duration, uint8_t repeat, size_t len, HomeLightPattern_t patterns[])
-{
-    _FUNC_;
-    assert((len > 0 && patterns) || (len == 0 && !patterns));
-    int ret = 0;
-    SubCmd_38_t subcmd = {
-        .base_duration = duration,
-        .pattern_count = len & 0xF,
-        .repeat_count = repeat,
-        .start_intensity = intensity,
-        .patterns = home_light_pattern(patterns, len & 0xF),
-    };
-    createCmdOutputReport(session->output, 0x38, (SubCmd_t *)&subcmd, sizeof(SubCmd_38_t));
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x38, 10);
-    return ret;
-}
-
-int Console_enableImu(Session_t *session, uint8_t enable)
-{
-    _FUNC_;
-    int ret = 0;
-    SubCmd_40_t subcmd = {.enable_imu = (enable & 0x1)};
-    createCmdOutputReport(session->output, 0x40, (SubCmd_t *)&subcmd, sizeof(SubCmd_40_t));
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x40, 10);
-    return ret;
-}
-
-int Console_configImu(Session_t *session, GyroSensitivity_t gs, AccSensitivity_t as, GyroPerformance_t gp, AccBandwidth_t ab)
-{
-    _FUNC_;
-    int ret = 0;
-    if (gs > GYRO_SEN_2000DPS)
-        gs = GYRO_SEN_DEFAULT;
-    if (as > ACC_SEN_16G)
-        as = ACC_SEN_DEFAULT;
-    if (gp > GYRO_PERF_208HZ)
-        gp = GYRO_PERF_DEFAULT;
-    if (ab > ACC_BW_100HZ)
-        ab = ACC_BW_DEFAULT;
-    SubCmd_41_t subcmd = {
-        .gyro_sensitivity = gs,
-        .acc_sensitivity = as,
-        .gyro_performance = gp,
-        .acc_bandwidth = ab,
-    };
-    createCmdOutputReport(session->output, 0x41, (SubCmd_t *)&subcmd, sizeof(SubCmd_41_t));
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x41, 10);
-    return ret;
-}
-//max = 0x20
-int Console_readImuRegister(Session_t *session)
-{
-    _FUNC_;
-    int ret = 0;
-    SubCmd_43_t subcmd = {
-        .address = 0,
-        .count = 0,
-    };
-    createCmdOutputReport(session->output, 0x43, (SubCmd_t *)&subcmd, sizeof(SubCmd_43_t));
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x43, 10);
-    return ret;
-}
-
-int Console_writeImuRegister(Session_t *session)
-{
-    _FUNC_;
-    int ret = 0;
-    SubCmd_42_t subcmd = {
-        .address = 0,
-        .operation = 0x01,
-        .value = 0xFF,
-    };
-    createCmdOutputReport(session->output, 0x42, (SubCmd_t *)&subcmd, sizeof(SubCmd_42_t));
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x42, 10);
-    return ret;
-}
-
-int Console_enableVibration(Session_t *session, uint8_t enable)
-{
-    _FUNC_;
-    int ret = 0;
-    SubCmd_48_t subcmd = {.enable_vibration = enable & 0x1};
-    createCmdOutputReport(session->output, 0x48, (SubCmd_t *)&subcmd, sizeof(SubCmd_48_t));
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x48, 10);
-    return ret;
-}
-
-static void cleanup(void *arg)
-{
+    _func_printf_();
     assert(arg);
     Session_t *session = (Session_t *)arg;
-    printf("exit poll thread ...\n");
+    _func_printf_("exit poll thread ...");
     session->polling = 0;
     session->poll_thread = 0;
 }
 
-static void *poll(void *arg)
+static void *_poll(void *arg)
 {
-    _FUNC_;
+    _func_printf_();
     assert(arg);
     int ret = 0;
     Session_t *session;
     ret = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     ret = pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
     session = (Session_t *)arg;
-    session->polling = 1;
-    printf("enter poll thread ...\n");
+    _func_printf_("enter poll thread ...");
 
-    pthread_cleanup_push(cleanup, (void *)session);
+    pthread_cleanup_push(_poll_cleanup, (void *)session);
     while (1)
     {
-        msleep(1000);
-        printf("poll\n");
-    }
-    pthread_cleanup_pop(0);
+        if (!task_head_empty(&session->tasks))
+        {
+            //msleep(1000);
+            _func_printf_("Good morning~");
+            _recv_begin(session);
+            ret = _recv_end(session);
+            _func_printf_("polled");
+            if (ret < 0)
+            {
+                _func_printf_("poll recv error[%d],should exit?", ret);
+            }
+            else
+            {
+                // handle tasks
+                pthread_rwlock_rdlock(&session->input_lock);
+                pthread_mutex_lock(&session->tasks.lock);
+                _func_printf_("handle tasks begin");
 
-    cleanup((void *)session);
+                Task_t *task = (Task_t *)(session->tasks.head.next);
+                while (task)
+                {
+                    Task_t *next = (Task_t *)(task->head.next);
+                    _func_printf_("handle task[%p]", task);
+
+                    pthread_mutex_lock(&task->lock);
+                    task->state = DONE;
+                    if (0 == pthread_cond_signal(&task->cond))
+                    {
+                        list_del(&(session->tasks.head), &task->head);
+                        _func_printf_("handle task[%p] over, remove it", task);
+                    }
+                    pthread_mutex_unlock(&task->lock);
+                    if (task->delegate)
+                    {
+                        _func_printf_("task[%p] delegated, free it", task);
+                        task_free(task);
+                        free(task);
+                    }
+                    task = next;
+                    _func_printf_("next task -> %p", task);
+                };
+                // handle task over
+                _func_printf_("handle tasks over");
+                pthread_mutex_unlock(&session->tasks.lock);
+                pthread_rwlock_unlock(&session->input_lock);
+            }
+            _func_printf_("nothing to do, sleeping..zzZ");
+            msleep(15);
+        }
+    };
+    pthread_cleanup_pop(0);
+    _poll_cleanup((void *)session);
     pthread_exit(NULL);
-    printf("pthread_exit\n");
+    _func_printf_("pthread_exit\n");
     return NULL;
+}
+
+int Console_test(Session_t *session, uint8_t code)
+{
+    _func_printf_();
+    int ret = 0;
+    _send_begin(session);
+    memset((void *)session->output, code, sizeof(uint8_t));
+    ret = _send_end(session);
+    if (ret < 0)
+    {
+        _func_printf_("send error(%d)", ret);
+        return ret;
+    }
+    ret = _wait_until_timeout(session, code, 5);
+    return ret;
+}
+
+int Console_establish(Session_t *session)
+{
+    return 0;
+}
+
+int Console_suspend(Session_t *session)
+{
+    return 0;
+}
+
+int Console_abolish(Session_t *session)
+{
+    return 0;
+}
+
+int Console_getControllerInfo(Session_t *session, ControllerInfo_t *info)
+{
+    return 0;
+}
+
+int Console_getControllerVoltage(Session_t *session, uint16_t *voltage)
+{
+    return 0;
+}
+
+int Console_getControllerColor(Session_t *session, ControllerColor_t *color)
+{
+    return 0;
+}
+
+int Console_setPlayerLight(Session_t *session, Player_t player, PlayerFlash_t flash)
+{
+    return 0;
+}
+
+int Console_setHomeLight(Session_t *session, uint8_t intensity, uint8_t duration, uint8_t repeat, size_t len, HomeLightPattern_t patterns[])
+{
+    return 0;
+}
+
+int Console_enableImu(Session_t *session, uint8_t enable)
+{
+    return 0;
+}
+
+int Console_configImu(Session_t *session, GyroSensitivity_t gs, AccSensitivity_t as, GyroPerformance_t gp, AccBandwidth_t ab)
+{
+    return 0;
+}
+//max = 0x20
+int Console_readImuRegister(Session_t *session)
+{
+    return 0;
+}
+
+int Console_writeImuRegister(Session_t *session)
+{
+    return 0;
+}
+
+int Console_enableVibration(Session_t *session, uint8_t enable)
+{
+    return 0;
+}
+
+int Console_getControllerData(Session_t *session, Controller_t *controller)
+{
+    return 0;
+}
+
+int Console_setControllerDataCallback(Session_t *session, void (*callback)(Controller_t *))
+{
+    return 0;
+}
+
+int Console_getImuData(Session_t *session, ImuData_t *imu)
+{
+    return 0;
+}
+
+int Console_setImuDataCallback(Session_t *session, void (*callback)(ImuData_t *))
+{
+    return 0;
 }
 
 int Console_testPoll(Session_t *session)
 {
-    _FUNC_;
+    _func_printf_();
     int ret = 0;
-    if (session->polling || session->poll_thread)
+    if (session->poll_thread)
     {
-        ret = pthread_cancel(session->poll_thread);
-        if (ret < 0)
-        {
-            perror("pthread_cancel\n");
-            return ret;
-        }
-        session->poll_thread = 0;
+        return 1;
     }
-    else
-    {
-        ret = pthread_create(&session->poll_thread, NULL, poll, (void *)session);
-        if (ret < 0)
-        {
-            perror("pthread_cancel\n");
-            return ret;
-        }
-    }
+    ret = pthread_create(&session->poll_thread, NULL, _poll, (void *)session);
+    if (ret != 0)
+        fprintf(stderr, "pthread_create error(%d)\n", ret);
     return ret;
 }
 
@@ -390,50 +309,20 @@ int Console_stopPoll(Session_t *session)
     int ret = 0;
     if (session->polling || session->poll_thread)
     {
-        printf("polling, try to cancel it...\n");
+        _func_printf_("polling, try to cancel it...");
         if (ret = pthread_cancel(session->poll_thread) < 0)
         {
-            perror("pthread_cancel\n");
+            fprintf(stderr, "pthread_cancel error(%d)\n", ret);
             return ret;
         }
         pthread_join(session->poll_thread, NULL);
-        //pthread_mutex_destroy(&session->poll_mutex);
         session->poll_thread = 0;
-        //free(session->output);
-        //free(session->input);
-        printf("stop poll done\n");
+        _func_printf_("stop poll done");
     }
     return ret;
 }
 
 int Console_poll(Session_t *session, PollType_t type)
 {
-    _FUNC_;
-    int ret = 0;
-    SubCmd_03_t subcmd = {.poll_type = type};
-    createCmdOutputReport(session->output, 0x03, (SubCmd_t *)&subcmd, sizeof(SubCmd_03_t));
-    ret = _send(session);
-    ret = _wait_until_timeout(session, 0x03, 10);
-    if (ret < 0)
-        return ret;
-    if (session->polling || session->poll_thread)
-    {
-        ret = pthread_cancel(session->poll_thread);
-        if (ret < 0)
-        {
-            perror("pthread_cancel\n");
-            return ret;
-        }
-        session->poll_thread = 0;
-    }
-    else
-    {
-        ret = pthread_create(&session->poll_thread, NULL, poll, (void *)session);
-        if (ret < 0)
-        {
-            perror("pthread_cancel\n");
-            return ret;
-        }
-    }
-    return ret;
+    return 0;
 }

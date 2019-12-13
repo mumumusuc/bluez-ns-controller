@@ -3,7 +3,7 @@
 
 #define _STATIC_INLINE_ static inline
 #define _FUNC_ printf("call [%s]\n", __func__)
-#define _ARRARY_SIZE(array) sizeof(array) / sizeof(array[0])
+#define _func_printf_(fmt, ...) printf("[%s]"fmt"\n", __func__, ##__VA_ARGS__)
 
 #define _u16_le(raw) ((raw)[0] & 0x00FF) | (((raw)[1] << 8) & 0xFF00)
 #define _u16_be(raw) ((raw)[1] & 0x00FF) | (((raw)[0] << 8) & 0xFF00)

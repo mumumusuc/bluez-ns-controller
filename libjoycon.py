@@ -79,9 +79,9 @@ class Device(Structure):
                 memmove(buffer, c_char_p(data), c_size_t(length))
                 return length
             except IOError as e:
-                print(e)
+                print('_session_recv : ', e)
             except Exception as e:
-                print(e)
+                print('_session_recv : ', e)
             return -1
 
         self._session_send = _session_send

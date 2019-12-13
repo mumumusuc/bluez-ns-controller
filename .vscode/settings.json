@@ -9,6 +9,7 @@
         "assert.h": "c",
         "typeinfo": "cpp",
         "time.h": "c",
-        "session.h": "c"
+        "session.h": "c",
+        "defs.h": "c"
     }
 }
