@@ -84,16 +84,22 @@ class Device(Structure):
                 print('_session_recv : ', e)
             return -1
 
-        self._session_send = _session_send
-        self._session_recv = _session_recv
+        self.session_send = _session_send
+        self.session_recv = _session_recv
         create = _libjc.Session_create
         create.restype = c_void_p
         self._session = create(
             byref(self),
-            self._session_recv,
-            self._session_send,
+            _session_recv,
+            _session_send,
             None, None
         )
+
+    def _session_send(self):
+        self.session_send
+
+    def _session_recv(self):
+        self.session_recv
 
     def __del__(self):
         _libjc.Session_release(self._session)
@@ -146,11 +152,8 @@ class Console(Device):
             c_int(flash)
         )
 
-    def testPoll(self):
-        _libjc.Console_testPoll(self._session)
-
-    def stopPoll(self):
-        _libjc.Console_stopPoll(self._session)
+    def test(self):
+        print(super._session_recv())
 
 
 class Controller(Device):
@@ -177,5 +180,5 @@ if __name__ == '__main__':
     # do some test
     device = None
     console = Console(device=device)
-    # console.test()
-    console.setHomeLight()
+    console.test()
+    # console.setHomeLight()

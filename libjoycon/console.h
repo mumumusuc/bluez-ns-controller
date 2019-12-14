@@ -12,6 +12,9 @@ static Device_t SwitchConsole = {
     .serial_number = "XAJ70017696541",
 };
 
+API_PUBLIC Session_t *Console_createSession();
+API_PUBLIC void Console_releaseSession(Session_t *);
+
 API_PUBLIC int Console_establish(Session_t *);
 API_PUBLIC int Console_abolish(Session_t *);
 
@@ -38,8 +41,6 @@ API_HIDE int Console_writeMemory(Session_t *, uint32_t, uint8_t *, size_t);
 API_HIDE int Console_eraseMemory(Session_t *, uint32_t, size_t);
 
 // poll
-API_PUBLIC int Console_testPoll(Session_t *);
-API_PUBLIC int Console_stopPoll(Session_t *);
 API_HIDE int Console_test(Session_t *, uint8_t);
 API_HIDE int Console_poll(Session_t *, PollType_t);
 #endif //  _CONSOLE_H_

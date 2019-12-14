@@ -68,6 +68,7 @@ typedef struct
     pthread_cond_t cond;
     int timeout;
     int delegate;
+    int persist;
 } Task_t;
 
 #define task_head_init(header)                     \
