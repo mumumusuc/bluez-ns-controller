@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -48,23 +49,42 @@ int test_send2(uint8_t *buffer, size_t size) {
     return 1;
 }
 
-static void *test_input_thread(void *arg) {
+static void *test_input_thread1(void *arg) {
     Session_t *session = (Session_t *)arg;
     int ret = 0;
     Controller_t controller;
     for (int i = 0; i < 100; i++) {
-        /*
-        _func_printf_();
         int ret = Session_test(session, 'p');
-        _func_printf_("Session_test return -> %d", ret);
-        assert(ret == -ETIMEDOUT);
-        */
-        ret = Console_getControllerData(session, &controller);
-        _func_printf_("Console_getControllerData -> %d", ret);
-        if (ret >= 0) {
-            _func_printf_("get button -> %d", controller.button);
+        _func_printf_("Session_test1 return -> %d", ret);
+        if (ret != -ETIMEDOUT) {
+            exit(-1);
         }
+        /*
+         ret = Console_getControllerData(session, &controller);
+         _func_printf_("Console_getControllerData -> %d", ret);
+         if (ret >= 0) {
+             _func_printf_("get button -> %d", controller.button);
+         }
+         */
     }
+    _func_printf_("exit input thread");
+    pthread_exit(NULL);
+    return NULL;
+}
+
+static void *test_input_thread2(void *arg) {
+    Session_t *session = (Session_t *)arg;
+    int ret = 0;
+    Controller_t controller;
+    for (int i = 0; i < 100; i++) {
+        int ret = Session_test(session, test_magic);
+        _func_printf_("Session_test2 return -> %d", ret);
+        if (ret != 0) {
+            exit(-2);
+        }
+        usleep(1000 * 50);
+    }
+    _func_printf_("exit input thread");
     pthread_exit(NULL);
     return NULL;
 }
@@ -72,9 +92,9 @@ static void *test_input_thread(void *arg) {
 int main() {
     /*
     test_magic = 'm';
-    pthread_t input;
+    //pthread_t input;
     Session_t *session = Console_createSession(test_recv2, test_send2);
-    pthread_create(&input, NULL, test_input_thread, session);
+    //pthread_create(&input, NULL, test_input_thread, session);
     for (int i = 0; i < 3; i++) {
         _func_printf_();
         int ret = Console_test(session, test_magic);
@@ -82,24 +102,36 @@ int main() {
         assert(ret >= 0);
         usleep(1000 * 500);
     }
-    pthread_join(input, NULL);
+    //pthread_join(input, NULL);
     Console_releaseSession(session);
-    */
-    /*
+
+/*
     int ret = 0;
-    pthread_t input;
+    test_magic = 'd';
     Session_t *session = Session_create(&SwitchConsole, test_recv2, test_send2);
-    pthread_create(&input, NULL, test_input_thread, session);
+    /*
+    pthread_t input1, input2;
+    pthread_create(&input1, NULL, test_input_thread1, session);
+    pthread_create(&input2, NULL, test_input_thread2, session);
     ret = Session_active(session);
-    ret = Session_test(session, test_magic);
-    _func_printf_("Session_test 1 -> %d", ret);
-    assert(ret == 0);
-    usleep(1000 * 1000);
-    ret = Session_test(session, 't');
-    _func_printf_("Session_test 2 -> %d", ret);
-    assert(ret == -ETIMEDOUT);
-    Session_release(session);
+
+    for (int i = 0; i < 5; i++) {
+        ret = Session_test(session, test_magic);
+        _func_printf_("Session_test %i -> %d", i, ret);
+        assert(ret == 0);
+    }
+    usleep(100 * 1000);
+    /*
+    for (int i = 0; i < 5; i++) {
+        ret = Session_test(session, 't');
+        _func_printf_("Session_test %d -> %d", i, ret);
+        assert(ret == -ETIMEDOUT);
+    }
     */
+    // pthread_join(input1, NULL);
+    // pthread_join(input2, NULL);
+    // Session_release(session);
+
     fd = open(hidraw, O_RDWR);
     if (fd < 0) {
         perror("open hid failed\n");
@@ -111,20 +143,21 @@ int main() {
     // ControllerColor_t color = {};
     // Console_getControllerColor(session, &color);
     Console_poll(session, 0);
-    pthread_t input;
-    pthread_create(&input, NULL, test_input_thread, session);
+    // pthread_t input;
+    // pthread_create(&input, NULL, test_input_thread, session);
     for (int i = 0; i <= 0xF; i++) {
         ret = Console_setPlayerLight(session, i, 0);
         _func_printf_("Console_setPlayerLight -> %d", ret);
         if (ret < 0)
             break;
-        usleep(1000 * 300);
+        usleep(1000 * 200);
     }
     Console_setPlayerLight(session, 1, 0);
     // Console_abolish(session);
-    pthread_join(input, NULL);
+    // pthread_join(input, NULL);
     Console_releaseSession(session);
     close(fd);
+
     /*
     Controller_t *pro = createProController(NULL);
     assert(pro != NULL);

@@ -10,21 +10,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-struct Session {
-    Recv *recv;
-    Send *send;
-    InputReport_t *input;
-    OutputReport_t *output;
-    Device_t host;
-    int8_t poll_active;
-    pthread_t poll_thread;
-    pthread_mutex_t poll_lock;
-    pthread_cond_t poll_cond;
-    pthread_rwlock_t input_lock;
-    pthread_rwlock_t output_lock;
-    TaskHead_t tasks;
-};
-
 #define msleep(t) usleep(1000 * (t))
 #define assert_console_session(s)                                              \
     do {                                                                       \
@@ -33,46 +18,48 @@ struct Session {
     } while (0)
 
 Session_t *Console_createSession(Recv *recv, Send *send) {
-    _func_printf_();
+    //_func_printf_();
     Session_t *session = Session_create(&SwitchConsole, recv, send);
     if (!session) {
-        _func_printf_("create session error");
+        //_func_printf_("create session error");
         return NULL;
     }
     Session_active(session);
     return session;
 }
 void Console_releaseSession(Session_t *session) {
-    _func_printf_();
+    //_func_printf_();
     Session_release(session);
 }
 
 int Console_test(Session_t *session, uint8_t code) {
-    _func_printf_();
+    //_func_printf_();
     int ret = 0;
     session_send_begin(session);
-    memset((void *)session->output, code, sizeof(uint8_t));
+    memset(__session_output(session), code, sizeof(uint8_t));
     ret = session_send_end(session);
     if (ret < 0) {
         _func_printf_("send error(%d)", ret);
         return ret;
     }
-    ret = 5;
-    session_await_timeout(session, &ret) {
-        if (session->input->id == code) {
+    int timeout = 5;
+    session_task_begin(session);
+    session_task_wait(session, &timeout) {
+        InputReport_t *input = (InputReport_t *)__session_input(session);
+        if (input->id == code)
             break;
-        }
     }
-    ret = ret ? 0 : -ETIMEDOUT;
+    ret = session_task_end(session);
+    _func_printf_("timeout -> %d", timeout);
     return ret;
 }
 
 int Console_poll(Session_t *session, PollType_t type) {
-    _func_printf_();
+    //_func_printf_();
     int ret = 0;
     SubCmd_03_t subcmd = {.poll_type = POLL_STANDARD};
     session_send_begin(session);
-    createCmdOutputReport(session->output, 0x03, (SubCmd_t *)&subcmd,
+    createCmdOutputReport(__session_output(session), 0x03, (SubCmd_t *)&subcmd,
                           sizeof(SubCmd_03_t));
     ret = session_send_end(session);
     if (ret < 0) {
@@ -80,15 +67,14 @@ int Console_poll(Session_t *session, PollType_t type) {
         return ret;
     }
     int timeout = 5;
-    session_await_timeout(session, &timeout) {
-        if (session->input->id == 0x21 &&
-            session->input->standard.reply.subcmd_id == 0x03) {
-            _func_printf_("test ok !");
+    session_task_begin(session);
+    session_task_wait(session, &timeout) {
+        InputReport_t *input = (InputReport_t *)__session_input(session);
+        if (input->id == 0x21 && input->standard.reply.subcmd_id == 0x03)
             break;
-        }
     }
+    ret = session_task_end(session);
     _func_printf_("timeout -> %d", timeout);
-    ret = timeout ? 0 : -ETIMEDOUT;
     return ret;
 }
 
@@ -112,14 +98,14 @@ int Console_getControllerColor(Session_t *session, ControllerColor_t *color) {
 
 int Console_setPlayerLight(Session_t *session, Player_t player,
                            PlayerFlash_t flash) {
-    _func_printf_();
+    //_func_printf_();
     int ret = 0;
     SubCmd_30_t subcmd = {
         .player = player,
         .flash = flash,
     };
     session_send_begin(session);
-    createCmdOutputReport(session->output, 0x30, (SubCmd_t *)&subcmd,
+    createCmdOutputReport(__session_output(session), 0x30, (SubCmd_t *)&subcmd,
                           sizeof(SubCmd_30_t));
     ret = session_send_end(session);
     if (ret < 0) {
@@ -127,15 +113,14 @@ int Console_setPlayerLight(Session_t *session, Player_t player,
         return ret;
     }
     int timeout = 50;
-    session_await_timeout(session, &timeout) {
-        if (session->input->id == 0x21 &&
-            session->input->standard.reply.subcmd_id == 0x30) {
-            _func_printf_("test ok !");
+    session_task_begin(session);
+    session_task_wait(session, &timeout) {
+        InputReport_t *input = (InputReport_t *)__session_input(session);
+        if (input->id == 0x21 && input->standard.reply.subcmd_id == 0x30)
             break;
-        }
     }
+    ret = session_task_end(session);
     _func_printf_("timeout -> %d", timeout);
-    ret = timeout ? 0 : -ETIMEDOUT;
     return ret;
 }
 
@@ -160,18 +145,17 @@ int Console_writeImuRegister(Session_t *session) { return 0; }
 int Console_enableVibration(Session_t *session, uint8_t enable) { return 0; }
 
 int Console_getControllerData(Session_t *session, Controller_t *controller) {
-    _func_printf_();
+    //_func_printf_();
     int ret = 0;
-    int timeout = 50;
-    session_await_timeout(session, &timeout) {
-        if (session->input->id == 0x30 || session->input->id == 0x21) {
-            _func_printf_("test ok !");
-            *controller = session->input->standard.controller;
-            break;
-        }
+    int timeout = 5;
+    session_task_begin(session);
+    session_task_wait(session, &timeout) {
+        InputReport_t *input = (InputReport_t *)__session_input(session);
+        *controller = input->standard.controller;
+        break;
     }
+    ret = session_task_end(session);
     _func_printf_("timeout -> %d", timeout);
-    ret = timeout ? 0 : -ETIMEDOUT;
     return ret;
 }
 
