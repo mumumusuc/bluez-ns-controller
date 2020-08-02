@@ -4,6 +4,21 @@
 
 **在我的rpi-3b(RaspbianLite, bluez5.43)，rpi-0w(RaspbianLite, bluez5.43)，PC(Pop!_OS 19.10, bluez5.50)成功测试**
 
+## Note
+
+1. 由于bluez5抛弃了很多旧版本的工具，所以编程方法应该变得更加“现代”，要遵循bluez doc的api进行编程。
+
+2. 事实上在一些ArchLinux上是可以直接bind本机蓝牙地址的，不需要重启bluetoothd。
+
+3. 对于以上问题，深究一下其实是bluez“贴心”的包揽了HID/HIDP的处理工作，而导致了用户的HID服务端无法运行。在bluez4在main.conf里有`DisablePlugins = input`的设置，而bluez5取消了这个config，使用`systemctl status bluetooth.service`查看蓝牙状态会发现bluez5不认这一设置。使用`bluetoothd -h`查看帮助项可知`-P, --noplugin=NAME,...     Specify plugins not to load`,所以在启动bluetoothd时指定`-P input`即可停止bluez5的HID服务让自己的程序正常运行。
+
+参考资料：
+
+  [mplementing a Bluetooth HID Profile on the Edison](https://community.intel.com/t5/Intel-Makers/Implementing-a-Bluetooth-HID-Profile-on-the-Edison/td-p/546841)
+
+  [iikeyboard](https://github.com/ii/iikeyboard/wiki) 
+
+
 ## Config
 
 1. set bluetooth PID&VID
