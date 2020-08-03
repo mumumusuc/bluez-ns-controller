@@ -27,18 +27,18 @@
   
   + DeviceID=bluetooth:057e:2009:200
   ```
-
+  
 2. set bluetoothd
   ```
   @ /etc/systemd/system/dbus-org.bluez.service
   
   - ExecStart=/usr/lib/bluetooth/bluetoothd
-  + ExecStart=/usr/lib/bluetooth/bluetoothd -C
+  + ExecStart=/usr/lib/bluetooth/bluetoothd -P input
   ```
 
 ## Dependencies
 
-> TBD
+python3-dbus python3-glib python3-evdev
 
 ## Run
 
